@@ -6,51 +6,32 @@ import (
 	"log"
 	"time"
 
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
 )
 
-func NewMongoDatabase(env *Env) mongo.Client {
-    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-    defer cancel()
+func NewDatabase(env *Env) mongo.Client {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-    dbHost := env.DBHost
-    dbPort := env.DBPort
-    dbUser := env.DBUser
-    dbPass := env.DBPass
+	dbHost := env.DBHost
+	dbPort := env.DBHost
+	dbUser := env.DBUser
+	dbPass := env.DBPass
 
-    mongodbURI := fmt.Sprintf("mognodb://%s:%s@%s:%s", dbUser, dbPass, dbHost, dbPort)
+	dbURI := fmt.Sprintf("mongodb+srv://%s:%s@%s:%s", dbUser, dbPass, dbHost, dbPort)
+	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
+	opts := options.Client().ApplyURI(dbURI).SetServerAPIOptions(serverAPI)
 
-    if dbUser == "" || dbPass == "" {
-        mongodbURI = fmt.Sprintf("mongodb://%s:%s", dbHost, dbPort)
-    }
+	client, err := mongo.Connect(opts)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    client, err := mongo.NewClient(mongodbURI)
-    if err != nil {
-        log.Fatal(err)
-    }
+	if err := client.Ping(context.TODO(), readpref.Primary()); err != nil {
+		panic(err)
+	}
 
-    err = client.Connect(ctx)
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    err = client.Ping(ctx)
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    return *client
-}
-
-func CloseMongoDBConnection(client mongo.Client) {
-    if client == nil {
-        return
-    }
-
-    err := client.Disconnect(context.TODO())
-    if err != nil {
-        log.Fatal(err)
-    }
-    
-    log.Println("Connection to MongoDB is closed.")
+	return *client
 }
